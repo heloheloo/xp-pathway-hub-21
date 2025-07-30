@@ -34,8 +34,9 @@ export const useGroupsAndAdmins = () => {
   const fetchGroupsAndAdmins = async () => {
     try {
       setLoading(true);
+      console.log('Starting fetchGroupsAndAdmins...');
 
-      // Fetch groups with admin info - avoid the problematic join
+      // Fetch groups with admin info - simplified query to avoid recursion
       const { data: groupsData, error: groupsError } = await supabase
         .from('groups')
         .select(`
@@ -46,12 +47,19 @@ export const useGroupsAndAdmins = () => {
           created_at
         `);
 
+      console.log('Groups fetch result:', { groupsData, groupsError });
+
       if (groupsError) {
         console.error('Error fetching groups:', groupsError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch teams from database",
+          variant: "destructive",
+        });
         return;
       }
 
-      // Fetch admins with group info
+      // Fetch admins with group info - simplified to avoid recursion
       const { data: adminsData, error: adminsError } = await supabase
         .from('profiles')
         .select(`
@@ -60,13 +68,19 @@ export const useGroupsAndAdmins = () => {
           email,
           group_id,
           created_at,
-          status,
-          groups(name)
+          status
         `)
         .eq('role', 'admin');
 
+      console.log('Admins fetch result:', { adminsData, adminsError });
+
       if (adminsError) {
         console.error('Error fetching admins:', adminsError);
+        toast({
+          title: "Error", 
+          description: "Failed to fetch admins from database",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -100,16 +114,26 @@ export const useGroupsAndAdmins = () => {
         })
       );
 
-      // Process admins data
-      const processedAdmins = (adminsData || []).map((admin) => ({
-        id: admin.id,
-        username: admin.username,
-        email: admin.email || '',
-        groupId: admin.group_id || '',
-        groupName: admin.groups?.name || '',
-        createdAt: admin.created_at,
-        status: admin.status || 'active',
-      }));
+      // Process admins data - get group names separately
+      const processedAdmins = await Promise.all(
+        (adminsData || []).map(async (admin) => {
+          let groupName = '';
+          if (admin.group_id) {
+            const groupData = groupsData?.find(g => g.id === admin.group_id);
+            groupName = groupData?.name || '';
+          }
+          
+          return {
+            id: admin.id,
+            username: admin.username,
+            email: admin.email || '',
+            groupId: admin.group_id || '',
+            groupName: groupName,
+            createdAt: admin.created_at,
+            status: admin.status || 'active',
+          };
+        })
+      );
 
       setGroups(processedGroups);
       setAdmins(processedAdmins);
