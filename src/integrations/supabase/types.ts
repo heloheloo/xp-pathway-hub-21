@@ -328,6 +328,10 @@ export type Database = {
         Args: { group_uuid: string }
         Returns: number
       }
+      get_user_role_direct: {
+        Args: { user_uuid: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
