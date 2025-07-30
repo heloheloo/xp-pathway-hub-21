@@ -125,6 +125,8 @@ export const useGroupsAndAdmins = () => {
     }
   };
 
+  // Teams are now pre-created, so we don't need manual group creation
+  // But we keep the function for backward compatibility
   const createGroup = async (name: string, description?: string) => {
     try {
       console.log('Creating group with:', { name, description, user: user?.id });
@@ -143,7 +145,7 @@ export const useGroupsAndAdmins = () => {
       console.log('Group created successfully:', data);
 
       toast({
-        title: "Group created",
+        title: "Team created",
         description: `${name} has been created successfully`,
       });
 
@@ -153,7 +155,7 @@ export const useGroupsAndAdmins = () => {
       console.error('Error creating group:', error);
       toast({
         title: "Error",
-        description: "Failed to create group",
+        description: "Failed to create team",
         variant: "destructive",
       });
       throw error;
