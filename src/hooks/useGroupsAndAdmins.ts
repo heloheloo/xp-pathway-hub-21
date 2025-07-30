@@ -35,7 +35,7 @@ export const useGroupsAndAdmins = () => {
     try {
       setLoading(true);
 
-      // Fetch groups with admin info
+      // Fetch groups with admin info - avoid the problematic join
       const { data: groupsData, error: groupsError } = await supabase
         .from('groups')
         .select(`
@@ -43,8 +43,7 @@ export const useGroupsAndAdmins = () => {
           name,
           description,
           admin_id,
-          created_at,
-          profiles!groups_admin_id_fkey(username)
+          created_at
         `);
 
       if (groupsError) {
@@ -78,11 +77,22 @@ export const useGroupsAndAdmins = () => {
           const { data: studentCountData } = await supabase
             .rpc('get_group_student_count', { group_uuid: group.id });
 
+          // Get admin username separately if admin_id exists
+          let adminName = '';
+          if (group.admin_id) {
+            const { data: adminData } = await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', group.admin_id)
+              .single();
+            adminName = adminData?.username || '';
+          }
+
           return {
             id: group.id,
             name: group.name,
             adminId: group.admin_id || '',
-            adminName: group.profiles?.username || '',
+            adminName: adminName,
             studentCount: studentCountData || 0,
             description: group.description,
             createdAt: group.created_at,
