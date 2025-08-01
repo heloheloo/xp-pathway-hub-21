@@ -109,31 +109,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (username: string, password: string, role: UserRole): Promise<boolean> => {
     try {
-      // Handle backend superadmin login
+      // Handle UI demo superadmin login
       if (role === 'superadmin') {
         if (username === SUPERADMIN_CREDENTIALS.username && password === SUPERADMIN_CREDENTIALS.password) {
-          // Get the superadmin profile from database
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('username', 'superadmin')
-            .eq('role', 'superadmin')
-            .single();
-
-          if (error || !profile) {
-            console.error('Superadmin profile not found:', error);
-            return false;
-          }
-
-          // Set auth session manually for superadmin
+          // Create a demo superadmin user object
           const superadminUser: User = {
-            id: profile.id,
-            username: profile.username,
-            role: profile.role as UserRole,
-            email: profile.email,
-            groupId: profile.group_id,
-            xp: profile.xp,
-            level: profile.level
+            id: 'superadmin-demo-id',
+            username: 'superadmin',
+            role: 'superadmin',
+            email: 'superadmin@demo.com',
+            xp: 0,
+            level: 1
           };
           setUser(superadminUser);
           
