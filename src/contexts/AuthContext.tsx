@@ -69,21 +69,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   useEffect(() => {
-    // Check for superadmin session first
-    const superadminSession = localStorage.getItem('superadmin-session');
-    if (superadminSession) {
-      try {
-        const parsedUser = JSON.parse(superadminSession);
-        setUser(parsedUser);
-        setLoading(false);
-        return;
-      } catch (error) {
-        console.error('Error parsing superadmin session:', error);
-        localStorage.removeItem('superadmin-session');
-      }
-    }
-
-    // Get initial session for regular users
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         fetchUserProfile(session.user).then(setUser);
@@ -91,7 +77,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(false);
     });
 
-    // Listen for auth changes for regular users
+    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -109,22 +95,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (username: string, password: string, role: UserRole): Promise<boolean> => {
     try {
-      // Handle UI demo superadmin login
+      // Handle UI-only superadmin login
       if (role === 'superadmin') {
         if (username === SUPERADMIN_CREDENTIALS.username && password === SUPERADMIN_CREDENTIALS.password) {
-          // Create a demo superadmin user object
+          // Create a mock user object for superadmin
           const superadminUser: User = {
-            id: 'superadmin-demo-id',
+            id: 'superadmin-ui-only',
             username: 'superadmin',
             role: 'superadmin',
-            email: 'superadmin@demo.com',
+            email: 'superadmin@example.com',
             xp: 0,
             level: 1
           };
           setUser(superadminUser);
-          
-          // Store superadmin session in localStorage for persistence
-          localStorage.setItem('superadmin-session', JSON.stringify(superadminUser));
           return true;
         }
         return false;
@@ -167,9 +150,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    // For superadmin, clear localStorage and state
-    if (user?.role === 'superadmin') {
-      localStorage.removeItem('superadmin-session');
+    // For UI-only superadmin, just clear the state
+    if (user?.id === 'superadmin-ui-only') {
       setUser(null);
       return;
     }

@@ -34,36 +34,26 @@ export const useGroupsAndAdmins = () => {
   const fetchGroupsAndAdmins = async () => {
     try {
       setLoading(true);
-      console.log('Starting fetchGroupsAndAdmins...');
 
-      // Use the regular supabase client - the RLS policies will handle superadmin access
-      const client = supabase;
-
-      // Fetch groups with admin info - simplified query to avoid recursion
-      const { data: groupsData, error: groupsError } = await client
+      // Fetch groups with admin info
+      const { data: groupsData, error: groupsError } = await supabase
         .from('groups')
         .select(`
           id,
           name,
           description,
           admin_id,
-          created_at
+          created_at,
+          profiles!groups_admin_id_fkey(username)
         `);
-
-      console.log('Groups fetch result:', { groupsData, groupsError });
 
       if (groupsError) {
         console.error('Error fetching groups:', groupsError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch teams from database",
-          variant: "destructive",
-        });
         return;
       }
 
-      // Fetch admins with group info - simplified to avoid recursion
-      const { data: adminsData, error: adminsError } = await client
+      // Fetch admins with group info
+      const { data: adminsData, error: adminsError } = await supabase
         .from('profiles')
         .select(`
           id,
@@ -71,19 +61,13 @@ export const useGroupsAndAdmins = () => {
           email,
           group_id,
           created_at,
-          status
+          status,
+          groups(name)
         `)
         .eq('role', 'admin');
 
-      console.log('Admins fetch result:', { adminsData, adminsError });
-
       if (adminsError) {
         console.error('Error fetching admins:', adminsError);
-        toast({
-          title: "Error", 
-          description: "Failed to fetch admins from database",
-          variant: "destructive",
-        });
         return;
       }
 
@@ -91,25 +75,14 @@ export const useGroupsAndAdmins = () => {
       const processedGroups = await Promise.all(
         (groupsData || []).map(async (group) => {
           // Get student count for this group
-          const { data: studentCountData } = await client
+          const { data: studentCountData } = await supabase
             .rpc('get_group_student_count', { group_uuid: group.id });
-
-          // Get admin username separately if admin_id exists
-          let adminName = '';
-          if (group.admin_id) {
-            const { data: adminData } = await client
-              .from('profiles')
-              .select('username')
-              .eq('id', group.admin_id)
-              .single();
-            adminName = adminData?.username || '';
-          }
 
           return {
             id: group.id,
             name: group.name,
             adminId: group.admin_id || '',
-            adminName: adminName,
+            adminName: group.profiles?.username || '',
             studentCount: studentCountData || 0,
             description: group.description,
             createdAt: group.created_at,
@@ -117,26 +90,16 @@ export const useGroupsAndAdmins = () => {
         })
       );
 
-      // Process admins data - get group names separately
-      const processedAdmins = await Promise.all(
-        (adminsData || []).map(async (admin) => {
-          let groupName = '';
-          if (admin.group_id) {
-            const groupData = groupsData?.find(g => g.id === admin.group_id);
-            groupName = groupData?.name || '';
-          }
-          
-          return {
-            id: admin.id,
-            username: admin.username,
-            email: admin.email || '',
-            groupId: admin.group_id || '',
-            groupName: groupName,
-            createdAt: admin.created_at,
-            status: admin.status || 'active',
-          };
-        })
-      );
+      // Process admins data
+      const processedAdmins = (adminsData || []).map((admin) => ({
+        id: admin.id,
+        username: admin.username,
+        email: admin.email || '',
+        groupId: admin.group_id || '',
+        groupName: admin.groups?.name || '',
+        createdAt: admin.created_at,
+        status: admin.status || 'active',
+      }));
 
       setGroups(processedGroups);
       setAdmins(processedAdmins);
@@ -152,8 +115,6 @@ export const useGroupsAndAdmins = () => {
     }
   };
 
-  // Teams are now pre-created, so we don't need manual group creation
-  // But we keep the function for backward compatibility
   const createGroup = async (name: string, description?: string) => {
     try {
       console.log('Creating group with:', { name, description, user: user?.id });
@@ -172,7 +133,7 @@ export const useGroupsAndAdmins = () => {
       console.log('Group created successfully:', data);
 
       toast({
-        title: "Team created",
+        title: "Group created",
         description: `${name} has been created successfully`,
       });
 
@@ -182,7 +143,7 @@ export const useGroupsAndAdmins = () => {
       console.error('Error creating group:', error);
       toast({
         title: "Error",
-        description: "Failed to create team",
+        description: "Failed to create group",
         variant: "destructive",
       });
       throw error;
@@ -349,7 +310,7 @@ export const useGroupsAndAdmins = () => {
     fetchGroupsAndAdmins();
 
     // Only set up subscriptions for non-UI-only users
-    if (user?.role !== 'superadmin') {
+    if (user?.id !== 'superadmin-ui-only') {
       // Set up real-time subscriptions
       const profilesSubscription = supabase
         .channel('profiles-changes')

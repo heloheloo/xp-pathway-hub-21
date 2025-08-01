@@ -320,10 +320,6 @@ export type Database = {
         Args: { xp_points: number }
         Returns: number
       }
-      exec_as_superadmin: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -331,10 +327,6 @@ export type Database = {
       get_group_student_count: {
         Args: { group_uuid: string }
         Returns: number
-      }
-      get_user_role_direct: {
-        Args: { user_uuid: string }
-        Returns: string
       }
     }
     Enums: {
