@@ -36,8 +36,11 @@ export const useGroupsAndAdmins = () => {
       setLoading(true);
       console.log('Starting fetchGroupsAndAdmins...');
 
+      // Use the regular supabase client - the RLS policies will handle superadmin access
+      const client = supabase;
+
       // Fetch groups with admin info - simplified query to avoid recursion
-      const { data: groupsData, error: groupsError } = await supabase
+      const { data: groupsData, error: groupsError } = await client
         .from('groups')
         .select(`
           id,
@@ -60,7 +63,7 @@ export const useGroupsAndAdmins = () => {
       }
 
       // Fetch admins with group info - simplified to avoid recursion
-      const { data: adminsData, error: adminsError } = await supabase
+      const { data: adminsData, error: adminsError } = await client
         .from('profiles')
         .select(`
           id,
@@ -88,13 +91,13 @@ export const useGroupsAndAdmins = () => {
       const processedGroups = await Promise.all(
         (groupsData || []).map(async (group) => {
           // Get student count for this group
-          const { data: studentCountData } = await supabase
+          const { data: studentCountData } = await client
             .rpc('get_group_student_count', { group_uuid: group.id });
 
           // Get admin username separately if admin_id exists
           let adminName = '';
           if (group.admin_id) {
-            const { data: adminData } = await supabase
+            const { data: adminData } = await client
               .from('profiles')
               .select('username')
               .eq('id', group.admin_id)
@@ -346,7 +349,7 @@ export const useGroupsAndAdmins = () => {
     fetchGroupsAndAdmins();
 
     // Only set up subscriptions for non-UI-only users
-    if (user?.id !== 'superadmin-ui-only') {
+    if (user?.role !== 'superadmin') {
       // Set up real-time subscriptions
       const profilesSubscription = supabase
         .channel('profiles-changes')
