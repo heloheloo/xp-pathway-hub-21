@@ -69,7 +69,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   useEffect(() => {
-    // Get initial session
+    // Check for superadmin session first
+    const superadminSession = localStorage.getItem('superadmin-session');
+    if (superadminSession) {
+      try {
+        const parsedUser = JSON.parse(superadminSession);
+        setUser(parsedUser);
+        setLoading(false);
+        return;
+      } catch (error) {
+        console.error('Error parsing superadmin session:', error);
+        localStorage.removeItem('superadmin-session');
+      }
+    }
+
+    // Get initial session for regular users
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         fetchUserProfile(session.user).then(setUser);
@@ -77,7 +91,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen for auth changes for regular users
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -95,19 +109,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (username: string, password: string, role: UserRole): Promise<boolean> => {
     try {
-      // Handle UI-only superadmin login
+      // Handle backend superadmin login
       if (role === 'superadmin') {
         if (username === SUPERADMIN_CREDENTIALS.username && password === SUPERADMIN_CREDENTIALS.password) {
-          // Create a mock user object for superadmin
+          // Get the superadmin profile from database
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('username', 'superadmin')
+            .eq('role', 'superadmin')
+            .single();
+
+          if (error || !profile) {
+            console.error('Superadmin profile not found:', error);
+            return false;
+          }
+
+          // Set auth session manually for superadmin
           const superadminUser: User = {
-            id: 'superadmin-ui-only',
-            username: 'superadmin',
-            role: 'superadmin',
-            email: 'superadmin@example.com',
-            xp: 0,
-            level: 1
+            id: profile.id,
+            username: profile.username,
+            role: profile.role as UserRole,
+            email: profile.email,
+            groupId: profile.group_id,
+            xp: profile.xp,
+            level: profile.level
           };
           setUser(superadminUser);
+          
+          // Store superadmin session in localStorage for persistence
+          localStorage.setItem('superadmin-session', JSON.stringify(superadminUser));
           return true;
         }
         return false;
@@ -150,8 +181,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    // For UI-only superadmin, just clear the state
-    if (user?.id === 'superadmin-ui-only') {
+    // For superadmin, clear localStorage and state
+    if (user?.role === 'superadmin') {
+      localStorage.removeItem('superadmin-session');
       setUser(null);
       return;
     }
